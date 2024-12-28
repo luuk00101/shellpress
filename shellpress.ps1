@@ -2,6 +2,9 @@
 param(
     [Parameter(Mandatory=$false)]
     [switch]$Statistics,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$Transfer,
     
     [Parameter(Mandatory=$false, ValueFromRemainingArguments=$true)]
     [string[]]$MarkdownFiles
@@ -83,6 +86,36 @@ function Convert-Markdown {
     }
 }
 
+function Transfer-Files {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$sitePath
+    )
+
+    $username = Read-Host -Prompt "Enter your username for s.ics.upjs.sk"
+    
+    if ([string]::IsNullOrWhiteSpace($username)) {
+        Write-Error "Username is required for file transfer"
+        return
+    }
+
+    $files = Get-ChildItem -Path $sitePath -File
+    
+    foreach ($file in $files) {
+        Write-Verbose "Transferring $($file.Name) to s.ics.upjs.sk..."
+        
+        try {
+            & scp $file.FullName "${username}@s.ics.upjs.sk:~/"
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to transfer $($file.Name)"
+            }
+        }
+        catch {
+            Write-Error "Error transferring $($file.Name): $_"
+        }
+    }
+}
 
 function Publish-Portal {
     [CmdletBinding()]
@@ -121,6 +154,12 @@ function Publish-Portal {
     if ($Statistics) {
         Write-Verbose "Generating statistics"
         Create-Stats -SitePath $siteDir -MarkdownFiles $mdFiles
+    }
+
+    # Transfer files if requested
+    if ($Destination) {
+        Write-Verbose "Transfering files"
+        Transfer-Files -SitePath $siteDir
     }
     
     Write-Output "Portal generation completed successfully!"
